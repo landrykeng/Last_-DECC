@@ -30,11 +30,18 @@ from streamlit_echarts import JsCode, st_echarts
 COEF_FILE = "tableau_matieres_coefficients.xlsx"
 
 # La colonne NOTE est-elle DÉJÀ pondérée (note x coefficient) ?
-#   False : NOTE = note /20 brute -> moyenne individuelle = somme(NOTE x coef) / somme(coef)
-#   True  : NOTE = note x coef    -> moyenne individuelle = somme(NOTE) / somme(coef)
+#   False : NOTE = note /20 brute -> numérateur = somme(NOTE x coef)
+#   True  : NOTE = note x coef    -> numérateur = somme(NOTE)
 #           (la note /20 d'une matière est alors NOTE / coef)
-# Somme(coef) = total des coefficients de l'examen dans le fichier des coefficients
-# (Total_Coef_BEPC, Total_Coef_BEPC_BIL, ... calculés automatiquement).
+#
+# MOYENNE INDIVIDUELLE = numérateur / somme des coefficients DES MATIÈRES QUE LE CANDIDAT
+# A RÉELLEMENT PASSÉES (une ligne avec une note). Un candidat de CAP ne passe que les
+# matières de sa série : le dénominateur est donc propre à chaque candidat
+# (colonne TOTAL_COEF de la table candidat) et non le total de la feuille de l'examen.
+#
+# Une note manquante (vide) signifie-t-elle « matière non passée » (False : la matière est
+# exclue du calcul) ou « absent / zéro » (True : la matière compte avec 0, coef au dénominateur) ?
+NOTE_MANQUANTE_COMPTEE_ZERO = False
 NOTE_DEJA_PONDEREE = True
 
 EXAMS = {
@@ -172,17 +179,22 @@ def _prepare(df: pd.DataFrame, coefs: dict):
     else:
         df["NOTE20"] = df["NOTE"]
         weighted = df["NOTE"] * df["COEF"]
-    # Total des coefficients de l'examen (feuille du fichier xlsx)
-    tc = float(sum(cm.values())) if cm else float(len(df["_K"].unique()))
-
     df["CID"] = df.groupby(CAND_KEYS, sort=False).ngroup().astype("int32")
-    df["V_NOTE"] = weighted / tc          # contribution pondérée à la moyenne
-    agg = df.groupby("CID", sort=False)["V_NOTE"].agg(["sum", "size"])
+    # Matières réellement passées par le candidat : on ne compte que les lignes notées
+    # (sauf si NOTE_MANQUANTE_COMPTEE_ZERO : la note manquante vaut alors 0).
+    passed = df["NOTE"].notna() | NOTE_MANQUANTE_COMPTEE_ZERO
+    df["_W"] = weighted.fillna(0.0).where(passed, 0.0)
+    df["_C"] = df["COEF"].where(passed, 0.0)
+    df["_N"] = passed.astype("int8")
+    agg = df.groupby("CID", sort=False).agg(W=("_W", "sum"), C=("_C", "sum"), NB=("_N", "sum"))
 
     cand = df.drop_duplicates("CID")[["CID"] + ATTR].set_index("CID")
-    cand["MOYENNE"] = agg["sum"]          # moyenne individuelle = somme(note x coef) / Total_Coef
-    cand["NB_MATIERES"] = agg["size"]
+    # moyenne individuelle = somme(note x coef) / somme des coef des matières passées
+    cand["TOTAL_COEF"] = agg["C"]
+    cand["MOYENNE"] = agg["W"] / agg["C"].where(agg["C"] > 0)
+    cand["NB_MATIERES"] = agg["NB"]
     cand = cand.reset_index()
+    cand = cand[cand["MOYENNE"].notna()].reset_index(drop=True)   # candidats sans aucune note
     raw = df[["CID"] + ATTR + ["MATIERE", "COEF", "NOTE20"]].copy()
     for c in ATTR:
         cand[c] = cand[c].astype("category")
