@@ -466,7 +466,11 @@ def _markline(value, label, horizontal, dec, unit):
             "lineStyle": {"type": "dashed", "color": RED, "width": 2},
             "label": {"formatter": f"{label} : {value:.{dec}f}{unit}", "color": RED,
                       "fontWeight": 600, "fontSize": 11,
-                      "position": "end" if horizontal else "insideEndTop"},
+                      # Barres horizontales : la ligne est verticale. L'axe des valeurs est en
+                      # bas et l'axe des catégories est inversé, donc "start" place l'étiquette
+                      # en haut du graphique (côté opposé à la graduation), au-dessus des barres.
+                      "position": "start" if horizontal else "insideEndTop",
+                      "distance": 6 if horizontal else 4},
             "data": [{"xAxis": float(value)} if horizontal else {"yAxis": float(value)}]}
 
 

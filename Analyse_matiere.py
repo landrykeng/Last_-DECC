@@ -83,14 +83,16 @@ def render_exam(name):
     subj = mt(["MATIERE"], "moy").sort_values("VALUE")
     weak, best = subj.iloc[0], subj.iloc[-1]
 
-    k = st.columns(5)
-    #k[0].metric("Matières", fmt_int(d["MATIERE"].nunique()))
-    #k[1].metric("Moyenne des notes", f"{nat_moy:.2f}", f"Écart type : {nat_sd:.2f}", delta_color="off")
-    #k[2].metric("Taux de réussite (notes)", f"{nat_rate:.1f} %", f"Seuil : {seuil:.2f}", delta_color="off")
-    #k[3].metric("Matière la plus forte", str(best["MATIERE"]), f"Moyenne : {best['VALUE']:.2f}",
-       #         delta_color="off")
-    #k[4].metric("Matière la plus faible", str(weak["MATIERE"]), f"Moyenne : {weak['VALUE']:.2f}",
-       #         delta_color="off")
+    k = st.columns(3)
+    k[0].metric("Matières", fmt_int(d["MATIERE"].nunique()))
+    k[1].metric("Moyenne des notes", f"{nat_moy:.2f}", f"Écart type : {nat_sd:.2f}", delta_color="off")
+    k[2].metric("Taux de réussite (notes)", f"{nat_rate:.1f} %", f"Seuil : {seuil:.2f}", delta_color="off")
+    
+    kt = st.columns(2)
+    kt[0].metric("Matière la plus forte", str(best["MATIERE"]), f"Moyenne : {best['VALUE']:.2f}",
+                delta_color="off")
+    kt[1].metric("Matière la plus faible", str(weak["MATIERE"]), f"Moyenne : {weak['VALUE']:.2f}",
+                delta_color="off")
 
     # ---- A. Vue d'ensemble --------------------------------------------------
     section("overview", "Vue d'ensemble des matières",
